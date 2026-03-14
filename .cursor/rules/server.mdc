@@ -1,0 +1,73 @@
+---
+description: Nitro server-side API routes and utilities in server/
+globs: server/**
+alwaysApply: false
+---
+
+# Nitro Server Routes
+
+The `server/` directory contains Nuxt's Nitro server layer. These routes deploy
+with the app to Vercel -- they are NOT a separate service. They handle
+server-side concerns like Firestore access and image proxying that can't run in
+the browser.
+
+## Directory Layout
+
+```
+server/
+├── api/
+│   ├── firestore/          # Firestore CRUD (collections, documents, read, write, copy, delete)
+│   └── avatar/[url].ts     # Avatar image proxy
+└── utils/
+    ├── firebase.ts          # Firebase Admin init (prod vs emulator)
+    ├── cookies.ts           # Cookie handling
+    └── pathTransform.ts     # Firestore path utilities
+```
+
+## Adding Routes
+
+Follow Nitro file-based routing. The filename determines the HTTP method and
+path:
+
+```
+server/api/my-resource.get.ts      → GET  /api/my-resource
+server/api/my-resource.post.ts     → POST /api/my-resource
+server/api/my-resource/[id].get.ts → GET  /api/my-resource/:id
+```
+
+Route handler pattern:
+
+```typescript
+export default defineEventHandler(async (event) => {
+  const params = getQuery(event);        // query string
+  const body = await readBody(event);    // POST body
+  const id = getRouterParam(event, 'id'); // path params
+
+  // ... implementation ...
+  return { result: 'data' };
+});
+```
+
+## Firebase / Firestore
+
+`server/utils/firebase.ts` initializes Firebase Admin. It auto-detects the
+environment:
+
+- **Production** (Vercel): uses `GOOGLE_APPLICATION_CREDENTIALS` for real
+  Firestore (`lovelace-elemental` project)
+- **Local dev**: connects to the Firestore emulator at
+  `FIRESTORE_EMULATOR_HOST` (defaults to `192.168.128.200:8080`)
+
+Import from the utils:
+
+```typescript
+import { fireDb } from '~/server/utils/firebase';
+const doc = await fireDb.collection('my-collection').doc('id').get();
+```
+
+## Key Differences from Feature Modules
+
+- Server routes run on the server (Node.js), not in the browser
+- They have access to Firebase Admin, secrets, and server-only APIs
+- They do NOT have access to Vue composables, Vuetify, or any client-side code
+- Use `defineEventHandler`, not Vue component patterns
